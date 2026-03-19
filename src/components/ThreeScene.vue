@@ -1,7 +1,7 @@
 <template>
   <div class="three-scene-container" ref="containerRef">
     <canvas ref="canvasRef" class="three-canvas"></canvas>
-    
+
     <!-- 绘制辅助提示 -->
     <div class="drawing-hints" v-if="showHints">
       <div class="hint" v-if="editorStore.mode === 'draw-floor' && editorStore.currentFloorPoints.length > 0">
@@ -16,37 +16,34 @@
 
     <!-- 快捷键提示 -->
     <div class="shortcuts-hint">
-      <div class="shortcut-item">
-        <kbd>左键</kbd> 旋转
-      </div>
-      <div class="shortcut-item">
-        <kbd>右键</kbd> 平移
-      </div>
-      <div class="shortcut-item">
-        <kbd>滚轮</kbd> 缩放
-      </div>
+      <div class="shortcut-item"><kbd>左键</kbd> 旋转</div>
+      <div class="shortcut-item"><kbd>右键</kbd> 平移</div>
+      <div class="shortcut-item"><kbd>滚轮</kbd> 缩放</div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
-import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { useEditorStore } from '../stores/editorStore';
-import type { Point3D, FloorPlanImage } from '../types';
-import { DEFAULT_MODEL_PARAMS, generateId } from '../types';
-import { 
-  createShapeFromPoints, 
-  distanceXZ, 
-  calculateAngleXZ, 
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { useEditorStore } from "../stores/editorStore";
+import type { Point3D, FloorPlanImage } from "../types";
+import { DEFAULT_MODEL_PARAMS, generateId } from "../types";
+import {
+  createShapeFromPoints,
+  distanceXZ,
+  calculateAngleXZ,
   midpoint,
   createPointMarker,
-  createLineGeometry
-} from '../utils/geometryUtils';
+  createLineGeometry,
+} from "../utils/geometryUtils";
+import { useFurniture } from "../composables/useFurniture";
+import type { Furniture, MaterialPreset } from "../types";
 
 const emit = defineEmits<{
-  (e: 'scene-ready'): void;
+  (e: "scene-ready"): void;
+  (e: "furniture-selected", furniture: Furniture | null): void;
 }>();
 
 const editorStore = useEditorStore();
@@ -68,9 +65,26 @@ let floorPreviewLine: THREE.Line | null = null;
 let wallStartMarker: THREE.Mesh | null = null;
 let wallPreviewLine: THREE.Line | null = null;
 
+// 家具相关
+const furnitureContext = ref<{ scene: THREE.Scene; camera: THREE.PerspectiveCamera } | null>(null);
+const {
+  furnitures,
+  selectedFurniture,
+  createSofa,
+  createCabinet,
+  applyMaterial,
+  selectFurniture,
+  getFurnitureFromRaycast,
+  removeFurniture,
+  clearAllFurniture,
+  MATERIAL_PRESETS,
+} = useFurniture(furnitureContext);
+
 const showHints = computed(() => {
-  return (editorStore.mode === 'draw-floor' && editorStore.currentFloorPoints.length > 0) ||
-         (editorStore.mode === 'draw-wall' && editorStore.currentWallStart);
+  return (
+    (editorStore.mode === "draw-floor" && editorStore.currentFloorPoints.length > 0) ||
+    (editorStore.mode === "draw-wall" && editorStore.currentWallStart)
+  );
 });
 
 // ================== 初始化 Three.js ==================
@@ -126,12 +140,16 @@ function initThree() {
   groundPlane = new THREE.Mesh(planeGeo, planeMat);
   groundPlane.rotation.x = -Math.PI / 2;
   groundPlane.position.y = 0;
-  groundPlane.name = 'ground-plane';
+  groundPlane.name = "ground-plane";
   scene.add(groundPlane);
 
   // 开始动画循环
   animate();
-  emit('scene-ready');
+
+  // 初始化家具上下文
+  furnitureContext.value = { scene, camera };
+
+  emit("scene-ready");
 }
 
 function animate() {
@@ -154,11 +172,11 @@ function handleResize() {
 // ================== 射线检测 ==================
 function getGroundPoint(event: MouseEvent): THREE.Vector3 | null {
   if (!canvasRef.value) return null;
-  
+
   const rect = canvasRef.value.getBoundingClientRect();
   const mouse = new THREE.Vector2(
     ((event.clientX - rect.left) / rect.width) * 2 - 1,
-    -((event.clientY - rect.top) / rect.height) * 2 + 1
+    -((event.clientY - rect.top) / rect.height) * 2 + 1,
   );
 
   const raycaster = new THREE.Raycaster();
@@ -178,7 +196,7 @@ function handleFloorClick(event: MouseEvent) {
 
   // 添加点标记
   const marker = createPointMarker(p, 0.8);
-  marker.name = 'floor-marker';
+  marker.name = "floor-marker";
   scene.add(marker);
   tempFloorMarkers.push(marker);
 
@@ -187,7 +205,7 @@ function handleFloorClick(event: MouseEvent) {
 
 function handleFloorDoubleClick() {
   if (editorStore.currentFloorPoints.length < 3) {
-    editorStore.updateStatusMessage('需要至少3个点来创建地板区域');
+    editorStore.updateStatusMessage("需要至少3个点来创建地板区域");
     return;
   }
 
@@ -222,12 +240,12 @@ function updateFloorDrawingLine() {
   const geometry = createLineGeometry(editorStore.currentFloorPoints);
   const material = new THREE.LineBasicMaterial({ color: 0x00ff88 });
   tempFloorLine = new THREE.Line(geometry, material);
-  tempFloorLine.name = 'floor-temp-line';
+  tempFloorLine.name = "floor-temp-line";
   scene.add(tempFloorLine);
 }
 
 function clearFloorTempObjects() {
-  tempFloorMarkers.forEach(m => {
+  tempFloorMarkers.forEach((m) => {
     scene.remove(m);
     m.geometry.dispose();
     (m.material as THREE.Material).dispose();
@@ -259,7 +277,7 @@ function handleWallDoubleClick(event: MouseEvent) {
   if (!editorStore.currentWallStart) {
     // 设置起点
     editorStore.setWallStart(p);
-    
+
     // 创建起点标记
     const geo = new THREE.SphereGeometry(0.6, 16, 16);
     const mat = new THREE.MeshBasicMaterial({ color: 0xff9f43 });
@@ -269,7 +287,7 @@ function handleWallDoubleClick(event: MouseEvent) {
   } else {
     // 完成墙体
     editorStore.completeWallSegment(p);
-    
+
     // 创建墙体线条
     const lastWall = editorStore.wallSegments[editorStore.wallSegments.length - 1];
     if (lastWall) {
@@ -312,13 +330,13 @@ function clearWallTempObjects() {
 
 // ================== 模型生成 ==================
 function generateModels() {
-  console.log('开始生成模型，地板多边形数量:', editorStore.floorPolygons.length);
-  
+  console.log("开始生成模型，地板多边形数量:", editorStore.floorPolygons.length);
+
   // 生成地板模型
   editorStore.floorPolygons.forEach((polygon, index) => {
     console.log(`处理地板 ${index}:`, polygon.points);
     if (polygon.points.length < 3) {
-      console.warn('地板顶点不足3个，跳过');
+      console.warn("地板顶点不足3个，跳过");
       return;
     }
 
@@ -334,12 +352,12 @@ function generateModels() {
     shape.closePath();
 
     // 挤出设置
-    const extrudeSettings = { 
-      depth: DEFAULT_MODEL_PARAMS.floorThickness, 
-      bevelEnabled: false 
+    const extrudeSettings = {
+      depth: DEFAULT_MODEL_PARAMS.floorThickness,
+      bevelEnabled: false,
     };
     const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    
+
     // 旋转使平面从 XY 变为 XZ（地面平面）
     // 旋转后: X不变, Y → Z, Z → -Y
     geometry.rotateX(-Math.PI / 2);
@@ -348,7 +366,7 @@ function generateModels() {
       color: DEFAULT_MODEL_PARAMS.floorColor,
       transparent: true,
       opacity: DEFAULT_MODEL_PARAMS.floorOpacity,
-      side: THREE.DoubleSide
+      side: THREE.DoubleSide,
     });
 
     const mesh = new THREE.Mesh(geometry, material);
@@ -359,8 +377,8 @@ function generateModels() {
     mesh.name = `floor-model-${polygon.id}`;
     scene.add(mesh);
     polygon.mesh = mesh;
-    
-    console.log('地板模型已添加到场景:', mesh.name);
+
+    console.log("地板模型已添加到场景:", mesh.name);
   });
 
   // 生成墙体模型
@@ -386,13 +404,13 @@ function generateModels() {
   });
 
   editorStore.setGeneratedModel(true);
-  editorStore.updateStatusMessage('3D模型已生成！使用鼠标旋转查看');
+  editorStore.updateStatusMessage("3D模型已生成！使用鼠标旋转查看");
 }
 
 // ================== 平面图上传 ==================
 async function uploadFloorPlan(file: File): Promise<boolean> {
-  if (!file.type.startsWith('image/')) {
-    editorStore.updateStatusMessage('请上传图片文件 (JPG/PNG)');
+  if (!file.type.startsWith("image/")) {
+    editorStore.updateStatusMessage("请上传图片文件 (JPG/PNG)");
     return false;
   }
 
@@ -417,18 +435,23 @@ async function uploadFloorPlan(file: File): Promise<boolean> {
     });
 
     const geometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
-    const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.9,
+    });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.y = 0.01;
-    mesh.name = 'floor-plan-image';
+    mesh.name = "floor-plan-image";
     scene.add(mesh);
 
     editorStore.setFloorPlan({ url: imageUrl, width: img.width, height: img.height, mesh });
     return true;
   } catch (error) {
-    console.error('图片加载失败:', error);
-    editorStore.updateStatusMessage('图片加载失败，请重试');
+    console.error("图片加载失败:", error);
+    editorStore.updateStatusMessage("图片加载失败，请重试");
     return false;
   }
 }
@@ -437,7 +460,7 @@ async function uploadFloorPlan(file: File): Promise<boolean> {
 function clearScene() {
   const toRemove: THREE.Object3D[] = [];
   scene.traverse((child) => {
-    if (child instanceof THREE.Mesh && child.name !== 'ground-plane') {
+    if (child instanceof THREE.Mesh && child.name !== "ground-plane") {
       toRemove.push(child);
     } else if (child instanceof THREE.Line) {
       toRemove.push(child);
@@ -449,7 +472,7 @@ function clearScene() {
     if (obj instanceof THREE.Mesh) {
       obj.geometry?.dispose();
       if (Array.isArray(obj.material)) {
-        obj.material.forEach(m => m.dispose());
+        obj.material.forEach((m) => m.dispose());
       } else {
         (obj.material as THREE.Material)?.dispose();
       }
@@ -468,17 +491,64 @@ function clearScene() {
   editorStore.clearAll();
 }
 
+// ================== 家具操作 ==================
+function handleAddSofa() {
+  const position = { x: 0, y: 0, z: 0 };
+  const sofa = createSofa(position);
+  selectFurniture(sofa);
+  emit('furniture-selected', sofa);
+}
+
+function handleAddCabinet() {
+  const position = { x: 30, y: 0, z: 0 };
+  const cabinet = createCabinet(position);
+  selectFurniture(cabinet);
+  emit('furniture-selected', cabinet);
+}
+
+function handleApplyMaterial(preset: MaterialPreset) {
+  if (selectedFurniture.value) {
+    applyMaterial(selectedFurniture.value, preset);
+  }
+}
+
+function handleSelectFurniture(furniture: Furniture | null) {
+  selectFurniture(furniture);
+  emit('furniture-selected', furniture);
+}
+
+function handleDeleteFurniture() {
+  if (selectedFurniture.value) {
+    removeFurniture(selectedFurniture.value);
+    emit('furniture-selected', null);
+  }
+}
+
+function handleFurnitureClick(event: MouseEvent) {
+  if (!canvasRef.value) return;
+
+  const furniture = getFurnitureFromRaycast(event, canvasRef.value);
+  if (furniture) {
+    handleSelectFurniture(furniture);
+  } else {
+    // 点击空白处取消选中
+    handleSelectFurniture(null);
+  }
+}
+
 // ================== 事件处理 ==================
 function handleClick(event: MouseEvent) {
   if (editorStore.mode === 'draw-floor') {
     handleFloorClick(event);
+  } else if (editorStore.mode === 'none') {
+    handleFurnitureClick(event);
   }
 }
 
 function handleDoubleClick(event: MouseEvent) {
-  if (editorStore.mode === 'draw-floor') {
+  if (editorStore.mode === "draw-floor") {
     handleFloorDoubleClick();
-  } else if (editorStore.mode === 'draw-wall') {
+  } else if (editorStore.mode === "draw-wall") {
     handleWallDoubleClick(event);
   }
 }
@@ -487,16 +557,24 @@ function handleDoubleClick(event: MouseEvent) {
 defineExpose({
   generateModels,
   clearScene,
-  uploadFloorPlan
+  uploadFloorPlan,
+  handleAddSofa,
+  handleAddCabinet,
+  handleApplyMaterial,
+  handleSelectFurniture,
+  handleDeleteFurniture,
+  furnitures,
+  selectedFurniture,
+  MATERIAL_PRESETS
 });
 
 onMounted(() => {
   initThree();
   if (canvasRef.value) {
-    canvasRef.value.addEventListener('click', handleClick);
-    canvasRef.value.addEventListener('dblclick', handleDoubleClick);
+    canvasRef.value.addEventListener("click", handleClick);
+    canvasRef.value.addEventListener("dblclick", handleDoubleClick);
   }
-  window.addEventListener('resize', handleResize);
+  window.addEventListener("resize", handleResize);
 });
 
 onUnmounted(() => {
@@ -505,7 +583,7 @@ onUnmounted(() => {
   }
   controls?.dispose();
   renderer?.dispose();
-  window.removeEventListener('resize', handleResize);
+  window.removeEventListener("resize", handleResize);
 });
 </script>
 
