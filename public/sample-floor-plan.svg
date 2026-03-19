@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <rect fill="#f8f9fa" width="800" height="600"/>
+  
+  <!-- 外墙 -->
+  <rect x="50" y="50" width="700" height="500" fill="none" stroke="#333" stroke-width="4"/>
+  
+  <!-- 客厅 Living Room -->
+  <rect x="50" y="50" width="400" height="300" fill="#e3f2fd" stroke="#333" stroke-width="2"/>
+  <text x="250" y="200" text-anchor="middle" font-family="Arial" font-size="20" fill="#333">客厅</text>
+  <text x="250" y="225" text-anchor="middle" font-family="Arial" font-size="14" fill="#666">Living Room</text>
+  
+  <!-- 主卧 Master Bedroom -->
+  <rect x="450" y="50" width="300" height="250" fill="#fff3e0" stroke="#333" stroke-width="2"/>
+  <text x="600" y="175" text-anchor="middle" font-family="Arial" font-size="20" fill="#333">主卧</text>
+  <text x="600" y="200" text-anchor="middle" font-family="Arial" font-size="14" fill="#666">Master Bedroom</text>
+  
+  <!-- 厨房 Kitchen -->
+  <rect x="50" y="350" width="250" height="200" fill="#e8f5e9" stroke="#333" stroke-width="2"/>
+  <text x="175" y="450" text-anchor="middle" font-family="Arial" font-size="20" fill="#333">厨房</text>
+  <text x="175" y="475" text-anchor="middle" font-family="Arial" font-size="14" fill="#666">Kitchen</text>
+  
+  <!-- 餐厅 Dining -->
+  <rect x="300" y="350" width="200" height="200" fill="#fce4ec" stroke="#333" stroke-width="2"/>
+  <text x="400" y="450" text-anchor="middle" font-family="Arial" font-size="20" fill="#333">餐厅</text>
+  <text x="400" y="475" text-anchor="middle" font-family="Arial" font-size="14" fill="#666">Dining</text>
+  
+  <!-- 次卧 Bedroom -->
+  <rect x="500" y="300" width="250" height="150" fill="#f3e5f5" stroke="#333" stroke-width="2"/>
+  <text x="625" y="375" text-anchor="middle" font-family="Arial" font-size="20" fill="#333">次卧</text>
+  <text x="625" y="400" text-anchor="middle" font-family="Arial" font-size="14" fill="#666">Bedroom</text>
+  
+  <!-- 卫生间 Bathroom -->
+  <rect x="500" y="450" width="250" height="100" fill="#e0f7fa" stroke="#333" stroke-width="2"/>
+  <text x="625" y="505" text-anchor="middle" font-family="Arial" font-size="20" fill="#333">卫生间</text>
+  <text x="625" y="530" text-anchor="middle" font-family="Arial" font-size="14" fill="#666">Bathroom</text>
+  
+  <!-- 门 Doors -->
+  <line x1="200" y1="350" x2="260" y2="350" stroke="#333" stroke-width="4"/>
+  <path d="M200,350 Q200,310 240,310" fill="none" stroke="#333" stroke-width="1" stroke-dasharray="3"/>
+  
+  <line x1="450" y1="150" x2="450" y2="210" stroke="#333" stroke-width="4"/>
+  <path d="M450,150 Q490,150 490,190" fill="none" stroke="#333" stroke-width="1" stroke-dasharray="3"/>
+  
+  <line x1="500" y1="380" x2="500" y2="440" stroke="#333" stroke-width="4"/>
+  <path d="M500,380 Q540,380 540,420" fill="none" stroke="#333" stroke-width="1" stroke-dasharray="3"/>
+  
+  <!-- 窗户 Windows -->
+  <line x1="100" y1="50" x2="200" y2="50" stroke="#2196f3" stroke-width="6"/>
+  <line x1="550" y1="50" x2="700" y2="50" stroke="#2196f3" stroke-width="6"/>
+  <line x1="750" y1="100" x2="750" y2="200" stroke="#2196f3" stroke-width="6"/>
+  <line x1="50" y1="400" x2="50" y2="500" stroke="#2196f3" stroke-width="6"/>
+  
+  <!-- 标题 Title -->
+  <text x="400" y="30" text-anchor="middle" font-family="Arial" font-size="12" fill="#999">Floor Plan / 平面图</text>
+</svg>
