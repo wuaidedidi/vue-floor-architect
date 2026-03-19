@@ -1,18 +1,20 @@
-import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
-import type { 
-  EditorMode, 
-  EditorState, 
-  FloorPlanImage, 
-  FloorPolygon, 
-  WallSegment, 
-  Point3D 
-} from '../types';
-import { generateId } from '../types';
+import { defineStore } from "pinia";
+import { ref, computed } from "vue";
+import type {
+  EditorMode,
+  EditorState,
+  FloorPlanImage,
+  FloorPolygon,
+  WallSegment,
+  Point3D,
+  Furniture,
+  FurnitureType,
+} from "../types";
+import { generateId } from "../types";
 
-export const useEditorStore = defineStore('editor', () => {
+export const useEditorStore = defineStore("editor", () => {
   // State
-  const mode = ref<EditorMode>('none');
+  const mode = ref<EditorMode>("none");
   const floorPlan = ref<FloorPlanImage | null>(null);
   const floorPolygons = ref<FloorPolygon[]>([]);
   const wallSegments = ref<WallSegment[]>([]);
@@ -20,7 +22,10 @@ export const useEditorStore = defineStore('editor', () => {
   const currentWallStart = ref<Point3D | null>(null);
   const isDrawing = ref(false);
   const hasGeneratedModel = ref(false);
-  const statusMessage = ref('请选择操作模式');
+  const statusMessage = ref("请选择操作模式");
+  const furnitures = ref<Furniture[]>([]);
+  const selectedFurnitureId = ref<string | null>(null);
+  const currentFurnitureType = ref<FurnitureType>("sofa");
 
   // Computed
   const canGenerate = computed(() => {
@@ -29,12 +34,23 @@ export const useEditorStore = defineStore('editor', () => {
 
   const modeLabel = computed(() => {
     switch (mode.value) {
-      case 'upload': return '上传平面图';
-      case 'draw-floor': return '绘制地面';
-      case 'draw-wall': return '绘制墙体';
-      case 'generate': return '生成模型';
-      default: return '选择操作';
+      case "upload":
+        return "上传平面图";
+      case "draw-floor":
+        return "绘制地面";
+      case "draw-wall":
+        return "绘制墙体";
+      case "generate":
+        return "生成模型";
+      case "furniture":
+        return "家具模式";
+      default:
+        return "选择操作";
     }
+  });
+
+  const selectedFurniture = computed(() => {
+    return furnitures.value.find((f) => f.id === selectedFurnitureId.value) || null;
   });
 
   // Actions
@@ -44,28 +60,31 @@ export const useEditorStore = defineStore('editor', () => {
       cancelCurrentDrawing();
     }
     mode.value = newMode;
-    
+
     switch (newMode) {
-      case 'upload':
-        statusMessage.value = '点击选择或拖拽图片上传平面图';
+      case "upload":
+        statusMessage.value = "点击选择或拖拽图片上传平面图";
         break;
-      case 'draw-floor':
-        statusMessage.value = '点击画布标记地板顶点，双击完成绘制';
+      case "draw-floor":
+        statusMessage.value = "点击画布标记地板顶点，双击完成绘制";
         break;
-      case 'draw-wall':
-        statusMessage.value = '双击设置墙体起点';
+      case "draw-wall":
+        statusMessage.value = "双击设置墙体起点";
         break;
-      case 'generate':
-        statusMessage.value = '点击生成按钮创建3D模型';
+      case "generate":
+        statusMessage.value = "点击生成按钮创建3D模型";
+        break;
+      case "furniture":
+        statusMessage.value = "点击添加家具，点击已有家具选中换装";
         break;
       default:
-        statusMessage.value = '请选择操作模式';
+        statusMessage.value = "请选择操作模式";
     }
   }
 
   function setFloorPlan(image: FloorPlanImage) {
     floorPlan.value = image;
-    statusMessage.value = '平面图已上传';
+    statusMessage.value = "平面图已上传";
   }
 
   function addFloorPoint(point: Point3D) {
@@ -78,7 +97,7 @@ export const useEditorStore = defineStore('editor', () => {
       const polygon: FloorPolygon = {
         id: generateId(),
         points: [...currentFloorPoints.value],
-        closed: true
+        closed: true,
       };
       floorPolygons.value.push(polygon);
       statusMessage.value = `地板区域已创建 (${polygon.points.length}个顶点)`;
@@ -96,7 +115,7 @@ export const useEditorStore = defineStore('editor', () => {
   function setWallStart(point: Point3D) {
     currentWallStart.value = point;
     isDrawing.value = true;
-    statusMessage.value = '双击设置墙体终点';
+    statusMessage.value = "双击设置墙体终点";
   }
 
   function completeWallSegment(endPoint: Point3D) {
@@ -104,10 +123,10 @@ export const useEditorStore = defineStore('editor', () => {
       const segment: WallSegment = {
         id: generateId(),
         start: { ...currentWallStart.value },
-        end: { ...endPoint }
+        end: { ...endPoint },
       };
       wallSegments.value.push(segment);
-      statusMessage.value = '墙体线段已创建';
+      statusMessage.value = "墙体线段已创建";
     }
     currentWallStart.value = null;
     isDrawing.value = false;
@@ -116,7 +135,7 @@ export const useEditorStore = defineStore('editor', () => {
   function setGeneratedModel(generated: boolean) {
     hasGeneratedModel.value = generated;
     if (generated) {
-      statusMessage.value = '3D模型已生成！可旋转查看';
+      statusMessage.value = "3D模型已生成！可旋转查看";
     }
   }
 
@@ -128,11 +147,43 @@ export const useEditorStore = defineStore('editor', () => {
     currentWallStart.value = null;
     isDrawing.value = false;
     hasGeneratedModel.value = false;
-    statusMessage.value = '已清空所有内容';
+    furnitures.value = [];
+    selectedFurnitureId.value = null;
+    statusMessage.value = "已清空所有内容";
   }
 
   function updateStatusMessage(message: string) {
     statusMessage.value = message;
+  }
+
+  function addFurniture(furniture: Furniture) {
+    furnitures.value.push(furniture);
+    statusMessage.value = `${furniture.name}已添加`;
+  }
+
+  function removeFurniture(id: string) {
+    const index = furnitures.value.findIndex((f) => f.id === id);
+    if (index !== -1) {
+      furnitures.value.splice(index, 1);
+      if (selectedFurnitureId.value === id) {
+        selectedFurnitureId.value = null;
+      }
+    }
+  }
+
+  function setSelectedFurniture(id: string | null) {
+    selectedFurnitureId.value = id;
+  }
+
+  function updateFurnitureMaterial(id: string, materialType: string) {
+    const furniture = furnitures.value.find((f) => f.id === id);
+    if (furniture) {
+      furniture.materialType = materialType as any;
+    }
+  }
+
+  function setCurrentFurnitureType(type: FurnitureType) {
+    currentFurnitureType.value = type;
   }
 
   return {
@@ -146,9 +197,13 @@ export const useEditorStore = defineStore('editor', () => {
     isDrawing,
     hasGeneratedModel,
     statusMessage,
+    furnitures,
+    selectedFurnitureId,
+    currentFurnitureType,
     // Computed
     canGenerate,
     modeLabel,
+    selectedFurniture,
     // Actions
     setMode,
     setFloorPlan,
@@ -159,6 +214,11 @@ export const useEditorStore = defineStore('editor', () => {
     completeWallSegment,
     setGeneratedModel,
     clearAll,
-    updateStatusMessage
+    updateStatusMessage,
+    addFurniture,
+    removeFurniture,
+    setSelectedFurniture,
+    updateFurnitureMaterial,
+    setCurrentFurnitureType,
   };
 });
