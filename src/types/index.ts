@@ -1,7 +1,42 @@
 import * as THREE from 'three';
 
 /** 编辑器交互模式 */
-export type EditorMode = 'none' | 'upload' | 'draw-floor' | 'draw-wall' | 'generate';
+export type EditorMode = 'none' | 'upload' | 'draw-floor' | 'draw-wall' | 'generate' | 'roam';
+
+/** 第一人称漫游配置 */
+export interface FirstPersonRoamConfig {
+  height: number;
+  moveSpeed: number;
+  lookSpeed: number;
+  sprintMultiplier: number;
+  collisionRadius: number;
+}
+
+/** 体积光配置 */
+export interface VolumetricLightConfig {
+  color: number;
+  intensity: number;
+  distance: number;
+  angle: number;
+  volumetricIntensity: number;
+}
+
+/** 自动门配置 */
+export interface AutoDoorConfig {
+  width: number;
+  height: number;
+  openAngle: number;
+  openSpeed: number;
+  triggerDistance: number;
+}
+
+/** 漫游模式状态 */
+export interface RoamState {
+  isActive: boolean;
+  isLocked: boolean;
+  position: { x: number; y: number; z: number } | null;
+  isMoving: boolean;
+}
 
 /** 2D点坐标 */
 export interface Point2D {

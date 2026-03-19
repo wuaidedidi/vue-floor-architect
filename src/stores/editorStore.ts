@@ -1,18 +1,11 @@
-import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
-import type { 
-  EditorMode, 
-  EditorState, 
-  FloorPlanImage, 
-  FloorPolygon, 
-  WallSegment, 
-  Point3D 
-} from '../types';
-import { generateId } from '../types';
+import { defineStore } from "pinia";
+import { ref, computed } from "vue";
+import type { EditorMode, EditorState, FloorPlanImage, FloorPolygon, WallSegment, Point3D, RoamState } from "../types";
+import { generateId } from "../types";
 
-export const useEditorStore = defineStore('editor', () => {
+export const useEditorStore = defineStore("editor", () => {
   // State
-  const mode = ref<EditorMode>('none');
+  const mode = ref<EditorMode>("none");
   const floorPlan = ref<FloorPlanImage | null>(null);
   const floorPolygons = ref<FloorPolygon[]>([]);
   const wallSegments = ref<WallSegment[]>([]);
@@ -20,7 +13,14 @@ export const useEditorStore = defineStore('editor', () => {
   const currentWallStart = ref<Point3D | null>(null);
   const isDrawing = ref(false);
   const hasGeneratedModel = ref(false);
-  const statusMessage = ref('请选择操作模式');
+  const statusMessage = ref("请选择操作模式");
+
+  const roamState = ref<RoamState>({
+    isActive: false,
+    isLocked: false,
+    position: null,
+    isMoving: false,
+  });
 
   // Computed
   const canGenerate = computed(() => {
@@ -29,11 +29,18 @@ export const useEditorStore = defineStore('editor', () => {
 
   const modeLabel = computed(() => {
     switch (mode.value) {
-      case 'upload': return '上传平面图';
-      case 'draw-floor': return '绘制地面';
-      case 'draw-wall': return '绘制墙体';
-      case 'generate': return '生成模型';
-      default: return '选择操作';
+      case "upload":
+        return "上传平面图";
+      case "draw-floor":
+        return "绘制地面";
+      case "draw-wall":
+        return "绘制墙体";
+      case "generate":
+        return "生成模型";
+      case "roam":
+        return "室内漫游";
+      default:
+        return "选择操作";
     }
   });
 
@@ -44,28 +51,31 @@ export const useEditorStore = defineStore('editor', () => {
       cancelCurrentDrawing();
     }
     mode.value = newMode;
-    
+
     switch (newMode) {
-      case 'upload':
-        statusMessage.value = '点击选择或拖拽图片上传平面图';
+      case "upload":
+        statusMessage.value = "点击选择或拖拽图片上传平面图";
         break;
-      case 'draw-floor':
-        statusMessage.value = '点击画布标记地板顶点，双击完成绘制';
+      case "draw-floor":
+        statusMessage.value = "点击画布标记地板顶点，双击完成绘制";
         break;
-      case 'draw-wall':
-        statusMessage.value = '双击设置墙体起点';
+      case "draw-wall":
+        statusMessage.value = "双击设置墙体起点";
         break;
-      case 'generate':
-        statusMessage.value = '点击生成按钮创建3D模型';
+      case "generate":
+        statusMessage.value = "点击生成按钮创建3D模型";
+        break;
+      case "roam":
+        statusMessage.value = "点击场景进入漫游模式，WASD移动，鼠标控制视角";
         break;
       default:
-        statusMessage.value = '请选择操作模式';
+        statusMessage.value = "请选择操作模式";
     }
   }
 
   function setFloorPlan(image: FloorPlanImage) {
     floorPlan.value = image;
-    statusMessage.value = '平面图已上传';
+    statusMessage.value = "平面图已上传";
   }
 
   function addFloorPoint(point: Point3D) {
@@ -78,7 +88,7 @@ export const useEditorStore = defineStore('editor', () => {
       const polygon: FloorPolygon = {
         id: generateId(),
         points: [...currentFloorPoints.value],
-        closed: true
+        closed: true,
       };
       floorPolygons.value.push(polygon);
       statusMessage.value = `地板区域已创建 (${polygon.points.length}个顶点)`;
@@ -96,7 +106,7 @@ export const useEditorStore = defineStore('editor', () => {
   function setWallStart(point: Point3D) {
     currentWallStart.value = point;
     isDrawing.value = true;
-    statusMessage.value = '双击设置墙体终点';
+    statusMessage.value = "双击设置墙体终点";
   }
 
   function completeWallSegment(endPoint: Point3D) {
@@ -104,10 +114,10 @@ export const useEditorStore = defineStore('editor', () => {
       const segment: WallSegment = {
         id: generateId(),
         start: { ...currentWallStart.value },
-        end: { ...endPoint }
+        end: { ...endPoint },
       };
       wallSegments.value.push(segment);
-      statusMessage.value = '墙体线段已创建';
+      statusMessage.value = "墙体线段已创建";
     }
     currentWallStart.value = null;
     isDrawing.value = false;
@@ -116,7 +126,7 @@ export const useEditorStore = defineStore('editor', () => {
   function setGeneratedModel(generated: boolean) {
     hasGeneratedModel.value = generated;
     if (generated) {
-      statusMessage.value = '3D模型已生成！可旋转查看';
+      statusMessage.value = "3D模型已生成！可旋转查看";
     }
   }
 
@@ -128,11 +138,23 @@ export const useEditorStore = defineStore('editor', () => {
     currentWallStart.value = null;
     isDrawing.value = false;
     hasGeneratedModel.value = false;
-    statusMessage.value = '已清空所有内容';
+    statusMessage.value = "已清空所有内容";
   }
 
   function updateStatusMessage(message: string) {
     statusMessage.value = message;
+  }
+
+  function updateRoamState(state: Partial<RoamState>) {
+    roamState.value = { ...roamState.value, ...state };
+  }
+
+  function setRoamActive(active: boolean) {
+    roamState.value.isActive = active;
+    if (!active) {
+      roamState.value.isLocked = false;
+      roamState.value.isMoving = false;
+    }
   }
 
   return {
@@ -146,6 +168,7 @@ export const useEditorStore = defineStore('editor', () => {
     isDrawing,
     hasGeneratedModel,
     statusMessage,
+    roamState,
     // Computed
     canGenerate,
     modeLabel,
@@ -159,6 +182,8 @@ export const useEditorStore = defineStore('editor', () => {
     completeWallSegment,
     setGeneratedModel,
     clearAll,
-    updateStatusMessage
+    updateStatusMessage,
+    updateRoamState,
+    setRoamActive,
   };
 });

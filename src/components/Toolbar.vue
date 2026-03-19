@@ -3,9 +3,9 @@
     <div class="toolbar-brand">
       <div class="brand-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-          <path d="M2 17l10 5 10-5"/>
-          <path d="M2 12l10 5 10-5"/>
+          <path d="M12 2L2 7l10 5 10-5-10-5z" />
+          <path d="M2 17l10 5 10-5" />
+          <path d="M2 12l10 5 10-5" />
         </svg>
       </div>
       <span class="brand-text">3D建模工具</span>
@@ -15,108 +15,107 @@
 
     <div class="toolbar-actions">
       <!-- 上传平面图 -->
-      <button 
+      <button
         class="toolbar-btn"
         :class="{ active: editorStore.mode === 'upload' }"
         @click="handleUploadClick"
-        title="上传平面图"
-      >
+        title="上传平面图">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-          <polyline points="17 8 12 3 7 8"/>
-          <line x1="12" y1="3" x2="12" y2="15"/>
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
         </svg>
         <span>上传平面图</span>
       </button>
 
       <!-- 加载默认平面图 -->
-      <button 
-        class="toolbar-btn default-btn"
-        @click="showDefaultConfirm = true"
-        title="加载默认示例平面图"
-      >
+      <button class="toolbar-btn default-btn" @click="showDefaultConfirm = true" title="加载默认示例平面图">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <path d="M3 9h18"/>
-          <path d="M9 21V9"/>
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M3 9h18" />
+          <path d="M9 21V9" />
         </svg>
         <span>默认平面图</span>
       </button>
 
       <!-- 绘制地面 -->
-      <button 
+      <button
         class="toolbar-btn"
         :class="{ active: editorStore.mode === 'draw-floor' }"
         @click="editorStore.setMode('draw-floor')"
-        title="绘制地面区域"
-      >
+        title="绘制地面区域">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
-          <line x1="8" y1="2" x2="8" y2="18"/>
-          <line x1="16" y1="6" x2="16" y2="22"/>
+          <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+          <line x1="8" y1="2" x2="8" y2="18" />
+          <line x1="16" y1="6" x2="16" y2="22" />
         </svg>
         <span>绘制地面</span>
       </button>
 
       <!-- 绘制墙体 -->
-      <button 
+      <button
         class="toolbar-btn"
         :class="{ active: editorStore.mode === 'draw-wall' }"
         @click="editorStore.setMode('draw-wall')"
-        title="绘制墙体"
-      >
+        title="绘制墙体">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <path d="M3 9h18"/>
-          <path d="M3 15h18"/>
-          <path d="M9 3v18"/>
-          <path d="M15 3v18"/>
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M3 9h18" />
+          <path d="M3 15h18" />
+          <path d="M9 3v18" />
+          <path d="M15 3v18" />
         </svg>
         <span>绘制墙体</span>
       </button>
 
       <!-- 生成模型 -->
-      <button 
+      <button
         class="toolbar-btn generate-btn"
         :class="{ disabled: !editorStore.canGenerate }"
         :disabled="!editorStore.canGenerate"
         @click="handleGenerate"
-        title="生成3D模型"
-      >
+        title="生成3D模型">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-          <path d="M2 17l10 5 10-5"/>
-          <path d="M2 12l10 5 10-5"/>
+          <path d="M12 2L2 7l10 5 10-5-10-5z" />
+          <path d="M2 17l10 5 10-5" />
+          <path d="M2 12l10 5 10-5" />
         </svg>
         <span>生成模型</span>
+      </button>
+
+      <!-- 室内漫游 -->
+      <button
+        class="toolbar-btn roam-btn"
+        :class="{ active: editorStore.mode === 'roam', disabled: !editorStore.hasGeneratedModel }"
+        :disabled="!editorStore.hasGeneratedModel"
+        @click="handleRoam"
+        title="第一人称室内漫游">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="4" r="2" />
+          <path d="M12 6v6" />
+          <path d="M8 10l4 2 4-2" />
+          <path d="M12 12l-3 8" />
+          <path d="M12 12l3 8" />
+        </svg>
+        <span>室内漫游</span>
       </button>
     </div>
 
     <div class="toolbar-spacer"></div>
 
     <!-- 清空按钮 -->
-    <button 
-      class="toolbar-btn clear-btn"
-      @click="handleClear"
-      title="清空所有内容"
-    >
+    <button class="toolbar-btn clear-btn" @click="handleClear" title="清空所有内容">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="3 6 5 6 21 6"/>
-        <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-        <line x1="10" y1="11" x2="10" y2="17"/>
-        <line x1="14" y1="11" x2="14" y2="17"/>
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+        <line x1="10" y1="11" x2="10" y2="17" />
+        <line x1="14" y1="11" x2="14" y2="17" />
       </svg>
       <span>清空</span>
     </button>
 
     <!-- 隐藏的文件输入 -->
-    <input 
-      ref="fileInput"
-      type="file"
-      accept="image/*"
-      style="display: none"
-      @change="handleFileChange"
-    />
+    <input ref="fileInput" type="file" accept="image/*" style="display: none" @change="handleFileChange" />
 
     <!-- 确认加载默认平面图的对话框 -->
     <Teleport to="body">
@@ -125,23 +124,21 @@
           <div class="confirm-dialog">
             <div class="dialog-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                <path d="M3 9h18"/>
-                <path d="M9 21V9"/>
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M3 9h18" />
+                <path d="M9 21V9" />
               </svg>
             </div>
             <h3 class="dialog-title">加载默认平面图</h3>
             <p class="dialog-message">
-              是否加载示例平面图？<br/>
+              是否加载示例平面图？<br />
               <small>这将显示一个包含客厅、卧室、厨房等房间的户型图</small>
             </p>
             <div class="dialog-actions">
-              <button class="dialog-btn cancel-btn" @click="showDefaultConfirm = false">
-                取消
-              </button>
+              <button class="dialog-btn cancel-btn" @click="showDefaultConfirm = false">取消</button>
               <button class="dialog-btn confirm-btn" @click="loadDefaultFloorPlan">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="20 6 9 17 4 12"/>
+                  <polyline points="20 6 9 17 4 12" />
                 </svg>
                 是，加载
               </button>
@@ -154,14 +151,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useEditorStore } from '../stores/editorStore';
+import { ref } from "vue";
+import { useEditorStore } from "../stores/editorStore";
 
 const emit = defineEmits<{
-  (e: 'upload', file: File): void;
-  (e: 'load-default'): void;
-  (e: 'generate'): void;
-  (e: 'clear'): void;
+  (e: "upload", file: File): void;
+  (e: "load-default"): void;
+  (e: "generate"): void;
+  (e: "clear"): void;
+  (e: "roam"): void;
 }>();
 
 const editorStore = useEditorStore();
@@ -169,7 +167,7 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const showDefaultConfirm = ref(false);
 
 function handleUploadClick() {
-  editorStore.setMode('upload');
+  editorStore.setMode("upload");
   fileInput.value?.click();
 }
 
@@ -177,25 +175,36 @@ function handleFileChange(event: Event) {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
   if (file) {
-    emit('upload', file);
+    emit("upload", file);
   }
   // 重置input，允许重复选择同一文件
-  target.value = '';
+  target.value = "";
 }
 
 function loadDefaultFloorPlan() {
   showDefaultConfirm.value = false;
-  emit('load-default');
+  emit("load-default");
 }
 
 function handleGenerate() {
   if (editorStore.canGenerate) {
-    emit('generate');
+    emit("generate");
+  }
+}
+
+function handleRoam() {
+  if (editorStore.hasGeneratedModel) {
+    if (editorStore.mode === "roam") {
+      editorStore.setMode("none");
+    } else {
+      editorStore.setMode("roam");
+    }
+    emit("roam");
   }
 }
 
 function handleClear() {
-  emit('clear');
+  emit("clear");
 }
 </script>
 
@@ -316,6 +325,38 @@ function handleClear() {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+}
+
+.toolbar-btn.roam-btn {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  border-color: transparent;
+}
+
+.toolbar-btn.roam-btn:hover:not(.disabled) {
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+  transform: translateY(-1px);
+}
+
+.toolbar-btn.roam-btn.active {
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5);
+  animation: roamPulse 2s ease-in-out infinite;
+}
+
+.toolbar-btn.roam-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@keyframes roamPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.1);
+  }
 }
 
 .toolbar-btn.clear-btn {
@@ -462,11 +503,11 @@ function handleClear() {
   .toolbar-btn span {
     display: none;
   }
-  
+
   .toolbar-btn {
     padding: 10px;
   }
-  
+
   .brand-text {
     display: none;
   }
