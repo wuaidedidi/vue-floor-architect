@@ -1,7 +1,7 @@
 <template>
   <div class="three-scene-container" ref="containerRef">
     <canvas ref="canvasRef" class="three-canvas"></canvas>
-    
+
     <!-- 绘制辅助提示 -->
     <div class="drawing-hints" v-if="showHints">
       <div class="hint" v-if="editorStore.mode === 'draw-floor' && editorStore.currentFloorPoints.length > 0">
@@ -16,37 +16,31 @@
 
     <!-- 快捷键提示 -->
     <div class="shortcuts-hint">
-      <div class="shortcut-item">
-        <kbd>左键</kbd> 旋转
-      </div>
-      <div class="shortcut-item">
-        <kbd>右键</kbd> 平移
-      </div>
-      <div class="shortcut-item">
-        <kbd>滚轮</kbd> 缩放
-      </div>
+      <div class="shortcut-item"><kbd>左键</kbd> 旋转</div>
+      <div class="shortcut-item"><kbd>右键</kbd> 平移</div>
+      <div class="shortcut-item"><kbd>滚轮</kbd> 缩放</div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
-import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { useEditorStore } from '../stores/editorStore';
-import type { Point3D, FloorPlanImage } from '../types';
-import { DEFAULT_MODEL_PARAMS, generateId } from '../types';
-import { 
-  createShapeFromPoints, 
-  distanceXZ, 
-  calculateAngleXZ, 
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { useEditorStore } from "../stores/editorStore";
+import type { Point3D, FloorPlanImage, WeatherType } from "../types";
+import { DEFAULT_MODEL_PARAMS, generateId, WEATHER_PRESETS } from "../types";
+import {
+  createShapeFromPoints,
+  distanceXZ,
+  calculateAngleXZ,
   midpoint,
   createPointMarker,
-  createLineGeometry
-} from '../utils/geometryUtils';
+  createLineGeometry,
+} from "../utils/geometryUtils";
 
 const emit = defineEmits<{
-  (e: 'scene-ready'): void;
+  (e: "scene-ready"): void;
 }>();
 
 const editorStore = useEditorStore();
@@ -61,6 +55,18 @@ let controls: OrbitControls;
 let groundPlane: THREE.Mesh;
 let animationId: number | null = null;
 
+// 天气效果相关对象
+let ambientLight: THREE.AmbientLight;
+let directionalLight: THREE.DirectionalLight;
+let rainDrops: THREE.Points | null = null;
+let snowFlakes: THREE.Points | null = null;
+let windowGlass: THREE.Mesh | null = null;
+let rainDropMaterial: THREE.ShaderMaterial | null = null;
+let indoorLights: THREE.PointLight[] = [];
+let indoorLightHelpers: THREE.Mesh[] = [];
+let weatherTransitionProgress = 1;
+let targetWeatherConfig = WEATHER_PRESETS.sunny;
+
 // 临时绘制对象
 let tempFloorMarkers: THREE.Mesh[] = [];
 let tempFloorLine: THREE.Line | null = null;
@@ -69,8 +75,10 @@ let wallStartMarker: THREE.Mesh | null = null;
 let wallPreviewLine: THREE.Line | null = null;
 
 const showHints = computed(() => {
-  return (editorStore.mode === 'draw-floor' && editorStore.currentFloorPoints.length > 0) ||
-         (editorStore.mode === 'draw-wall' && editorStore.currentWallStart);
+  return (
+    (editorStore.mode === "draw-floor" && editorStore.currentFloorPoints.length > 0) ||
+    (editorStore.mode === "draw-wall" && editorStore.currentWallStart)
+  );
 });
 
 // ================== 初始化 Three.js ==================
@@ -105,14 +113,20 @@ function initThree() {
   controls.maxDistance = 500;
   controls.maxPolarAngle = Math.PI / 2 - 0.05;
 
-  // 添加灯光
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  // 添加灯光 - 使用可引用的变量
+  ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
   scene.add(ambientLight);
 
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+  directionalLight = new THREE.DirectionalLight(0xffffff, 1);
   directionalLight.position.set(50, 100, 50);
   directionalLight.castShadow = true;
   scene.add(directionalLight);
+
+  // 创建室内灯光
+  createIndoorLights();
+
+  // 创建示例窗户
+  createWindowGlass();
 
   // 添加网格
   const grid = new THREE.GridHelper(200, 40, 0x444466, 0x333344);
@@ -126,19 +140,368 @@ function initThree() {
   groundPlane = new THREE.Mesh(planeGeo, planeMat);
   groundPlane.rotation.x = -Math.PI / 2;
   groundPlane.position.y = 0;
-  groundPlane.name = 'ground-plane';
+  groundPlane.name = "ground-plane";
   scene.add(groundPlane);
 
   // 开始动画循环
   animate();
-  emit('scene-ready');
+  emit("scene-ready");
 }
 
 function animate() {
   animationId = requestAnimationFrame(animate);
   controls.update();
+
+  // 更新天气效果
+  updateWeatherEffects();
+
   renderer.render(scene, camera);
 }
+
+// ================== 天气效果系统 ==================
+function createIndoorLights() {
+  const lightPositions = [
+    { x: -30, y: 15, z: -30 },
+    { x: 30, y: 15, z: -30 },
+    { x: 0, y: 20, z: 0 },
+  ];
+
+  lightPositions.forEach((pos, index) => {
+    const light = new THREE.PointLight(0xffa500, 0, 50);
+    light.position.set(pos.x, pos.y, pos.z);
+    light.castShadow = true;
+    scene.add(light);
+    indoorLights.push(light);
+
+    const helperGeo = new THREE.SphereGeometry(1, 16, 16);
+    const helperMat = new THREE.MeshBasicMaterial({
+      color: 0xffa500,
+      transparent: true,
+      opacity: 0,
+    });
+    const helper = new THREE.Mesh(helperGeo, helperMat);
+    helper.position.copy(light.position);
+    scene.add(helper);
+    indoorLightHelpers.push(helper);
+  });
+}
+
+function createWindowGlass() {
+  const glassGeo = new THREE.PlaneGeometry(40, 25);
+
+  rainDropMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uRainIntensity: { value: 0 },
+      uDropColor: { value: new THREE.Color(0x88ccff) },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform float uRainIntensity;
+      uniform vec3 uDropColor;
+      varying vec2 vUv;
+      
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+      }
+      
+      float drop(vec2 uv, float speed, float offset) {
+        float t = uTime * speed + offset;
+        float y = fract(t + uv.y);
+        float x = uv.x + sin(t * 2.0) * 0.02;
+        
+        float trail = smoothstep(0.0, 0.15, y) * smoothstep(1.0, 0.3, y);
+        float dropShape = smoothstep(0.02, 0.0, abs(x - 0.5)) * trail;
+        
+        return dropShape * 0.8;
+      }
+      
+      void main() {
+        vec3 baseColor = vec3(0.15, 0.18, 0.22);
+        vec3 dropLayer = vec3(0.0);
+        
+        for(float i = 0.0; i < 5.0; i++) {
+          float offset = hash(vec2(i, i * 2.0)) * 10.0;
+          float speed = 0.3 + hash(vec2(i * 3.0, i)) * 0.4;
+          vec2 dropUv = vUv + vec2(hash(vec2(i, i * 5.0)) * 0.3, 0.0);
+          dropLayer += uDropColor * drop(dropUv, speed, offset) * uRainIntensity;
+        }
+        
+        float fog = (vUv.y * 0.3 + 0.1) * uRainIntensity;
+        vec3 fogColor = vec3(0.2, 0.25, 0.3);
+        
+        vec3 finalColor = mix(baseColor, dropLayer + baseColor, uRainIntensity);
+        finalColor = mix(finalColor, fogColor, fog * 0.5);
+        
+        gl_FragColor = vec4(finalColor, 0.7 + uRainIntensity * 0.2);
+      }
+    `,
+    transparent: true,
+    side: THREE.DoubleSide,
+  });
+
+  windowGlass = new THREE.Mesh(glassGeo, rainDropMaterial);
+  windowGlass.position.set(0, 15, -50);
+  windowGlass.name = "window-glass";
+  scene.add(windowGlass);
+
+  const frameGeo = new THREE.BoxGeometry(42, 27, 1);
+  const frameMat = new THREE.MeshPhongMaterial({ color: 0x4a3728 });
+  const frame = new THREE.Mesh(frameGeo, frameMat);
+  frame.position.set(0, 15, -50.5);
+  scene.add(frame);
+}
+
+function createRainEffect() {
+  if (rainDrops) return;
+
+  const dropCount = 5000;
+  const positions = new Float32Array(dropCount * 3);
+  const velocities = new Float32Array(dropCount);
+
+  for (let i = 0; i < dropCount; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * 200;
+    positions[i * 3 + 1] = Math.random() * 100;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 200;
+    velocities[i] = 0.5 + Math.random() * 0.5;
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("velocity", new THREE.BufferAttribute(velocities, 1));
+
+  const material = new THREE.PointsMaterial({
+    color: 0x88aacc,
+    size: 0.3,
+    transparent: true,
+    opacity: 0.6,
+  });
+
+  rainDrops = new THREE.Points(geometry, material);
+  rainDrops.name = "rain-effect";
+  scene.add(rainDrops);
+}
+
+function createSnowEffect() {
+  if (snowFlakes) return;
+
+  const flakeCount = 3000;
+  const positions = new Float32Array(flakeCount * 3);
+  const sizes = new Float32Array(flakeCount);
+
+  for (let i = 0; i < flakeCount; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * 200;
+    positions[i * 3 + 1] = Math.random() * 100;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 200;
+    sizes[i] = 0.5 + Math.random() * 1.5;
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("size", new THREE.BufferAttribute(sizes, 1));
+
+  const material = new THREE.PointsMaterial({
+    color: 0xffffff,
+    size: 1,
+    transparent: true,
+    opacity: 0.8,
+    sizeAttenuation: true,
+  });
+
+  snowFlakes = new THREE.Points(geometry, material);
+  snowFlakes.name = "snow-effect";
+  scene.add(snowFlakes);
+}
+
+function removeRainEffect() {
+  if (rainDrops) {
+    scene.remove(rainDrops);
+    rainDrops.geometry.dispose();
+    (rainDrops.material as THREE.Material).dispose();
+    rainDrops = null;
+  }
+}
+
+function removeSnowEffect() {
+  if (snowFlakes) {
+    scene.remove(snowFlakes);
+    snowFlakes.geometry.dispose();
+    (snowFlakes.material as THREE.Material).dispose();
+    snowFlakes = null;
+  }
+}
+
+function updateWeatherEffects() {
+  const time = performance.now() * 0.001;
+
+  // 更新雨滴动画
+  if (rainDrops && rainDrops.visible) {
+    const positions = rainDrops.geometry.attributes.position.array as Float32Array;
+    const velocities = rainDrops.geometry.attributes.velocity.array as Float32Array;
+
+    for (let i = 0; i < positions.length / 3; i++) {
+      positions[i * 3 + 1] -= velocities[i] * 2;
+
+      if (positions[i * 3 + 1] < 0) {
+        positions[i * 3 + 1] = 100;
+        positions[i * 3] = (Math.random() - 0.5) * 200;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 200;
+      }
+    }
+    rainDrops.geometry.attributes.position.needsUpdate = true;
+  }
+
+  // 更新雪花动画
+  if (snowFlakes && snowFlakes.visible) {
+    const positions = snowFlakes.geometry.attributes.position.array as Float32Array;
+
+    for (let i = 0; i < positions.length / 3; i++) {
+      positions[i * 3 + 1] -= 0.2;
+      positions[i * 3] += Math.sin(time + i) * 0.05;
+      positions[i * 3 + 2] += Math.cos(time + i * 0.5) * 0.05;
+
+      if (positions[i * 3 + 1] < 0) {
+        positions[i * 3 + 1] = 100;
+        positions[i * 3] = (Math.random() - 0.5) * 200;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 200;
+      }
+    }
+    snowFlakes.geometry.attributes.position.needsUpdate = true;
+  }
+
+  // 更新窗户水滴效果
+  if (rainDropMaterial) {
+    rainDropMaterial.uniforms.uTime.value = time;
+  }
+
+  // 更新室内灯光闪烁效果
+  const currentWeather = editorStore.currentWeather;
+  if (currentWeather === "rainy" || currentWeather === "snowy") {
+    indoorLights.forEach((light, index) => {
+      const baseIntensity = 2.0;
+      const flicker1 = Math.sin(time * 2.5 + index * 1.7) * 0.25;
+      const flicker2 = Math.sin(time * 5.3 + index * 2.3) * 0.15;
+      const flicker3 = Math.sin(time * 11.7 + index * 3.1) * 0.08;
+      const randomFlicker = (Math.random() - 0.5) * 0.1;
+      light.intensity = baseIntensity + flicker1 + flicker2 + flicker3 + randomFlicker;
+
+      const warmth = 0.5 + Math.sin(time * 1.5 + index) * 0.3;
+      const baseColor = new THREE.Color(0xffa500);
+      const warmColor = new THREE.Color(0xffcc66);
+      light.color.copy(baseColor.lerp(warmColor, warmth));
+    });
+
+    indoorLightHelpers.forEach((helper, index) => {
+      const flicker1 = Math.sin(time * 2.5 + index * 1.7) * 0.25;
+      const flicker2 = Math.sin(time * 5.3 + index * 2.3) * 0.15;
+      const flicker3 = Math.sin(time * 11.7 + index * 3.1) * 0.08;
+      const mat = helper.material as THREE.MeshBasicMaterial;
+      mat.opacity = 0.5 + flicker1 * 0.4 + flicker2 * 0.2 + flicker3 * 0.1;
+
+      const warmth = 0.5 + Math.sin(time * 1.5 + index) * 0.3;
+      const baseColor = new THREE.Color(0xffa500);
+      const warmColor = new THREE.Color(0xffcc66);
+      mat.color.copy(baseColor.lerp(warmColor, warmth));
+    });
+  }
+
+  // 平滑过渡天气效果
+  if (weatherTransitionProgress < 1) {
+    weatherTransitionProgress += 0.02;
+    weatherTransitionProgress = Math.min(weatherTransitionProgress, 1);
+    applyWeatherTransition();
+  }
+}
+
+function applyWeatherTransition() {
+  const config = targetWeatherConfig;
+  const t = weatherTransitionProgress;
+
+  // 平滑过渡环境光
+  const currentAmbientColor = ambientLight.color.clone();
+  const targetAmbientColor = new THREE.Color(config.ambientColor);
+  ambientLight.color.copy(currentAmbientColor.lerp(targetAmbientColor, t * 0.1));
+  ambientLight.intensity = THREE.MathUtils.lerp(ambientLight.intensity, config.ambientIntensity, t * 0.1);
+
+  // 平滑过渡方向光
+  const currentDirColor = directionalLight.color.clone();
+  const targetDirColor = new THREE.Color(config.directionalColor);
+  directionalLight.color.copy(currentDirColor.lerp(targetDirColor, t * 0.1));
+  directionalLight.intensity = THREE.MathUtils.lerp(directionalLight.intensity, config.directionalIntensity, t * 0.1);
+
+  // 平滑过渡背景色
+  const currentBgColor = scene.background as THREE.Color;
+  const targetBgColor = new THREE.Color(config.backgroundColor);
+  if (currentBgColor) {
+    currentBgColor.lerp(targetBgColor, t * 0.1);
+  }
+
+  // 更新雾效果
+  if (config.fogColor && config.fogDensity) {
+    if (!scene.fog) {
+      scene.fog = new THREE.FogExp2(config.fogColor, config.fogDensity);
+    } else {
+      const fog = scene.fog as THREE.FogExp2;
+      fog.color.lerp(new THREE.Color(config.fogColor), t * 0.1);
+      fog.density = THREE.MathUtils.lerp(fog.density, config.fogDensity, t * 0.1);
+    }
+  } else {
+    scene.fog = null;
+  }
+}
+
+function setWeather(weather: WeatherType) {
+  const config = WEATHER_PRESETS[weather];
+  targetWeatherConfig = config;
+  weatherTransitionProgress = 0;
+
+  // 控制雨效果
+  if (weather === "rainy") {
+    if (!rainDrops) createRainEffect();
+    rainDrops!.visible = true;
+    if (rainDropMaterial) {
+      rainDropMaterial.uniforms.uRainIntensity.value = 1;
+    }
+  } else {
+    if (rainDrops) rainDrops.visible = false;
+    if (rainDropMaterial) {
+      rainDropMaterial.uniforms.uRainIntensity.value = 0;
+    }
+  }
+
+  // 控制雪效果
+  if (weather === "snowy") {
+    if (!snowFlakes) createSnowEffect();
+    snowFlakes!.visible = true;
+  } else {
+    if (snowFlakes) snowFlakes.visible = false;
+  }
+
+  // 控制室内灯光
+  const showIndoorLights = weather === "rainy" || weather === "snowy" || weather === "cloudy";
+  indoorLights.forEach((light) => {
+    light.intensity = showIndoorLights ? 1.5 : 0;
+  });
+  indoorLightHelpers.forEach((helper) => {
+    const mat = helper.material as THREE.MeshBasicMaterial;
+    mat.opacity = showIndoorLights ? 0.3 : 0;
+  });
+}
+
+// 监听天气变化
+watch(
+  () => editorStore.currentWeather,
+  (newWeather) => {
+    setWeather(newWeather);
+  },
+);
 
 function handleResize() {
   if (!canvasRef.value) return;
@@ -154,11 +517,11 @@ function handleResize() {
 // ================== 射线检测 ==================
 function getGroundPoint(event: MouseEvent): THREE.Vector3 | null {
   if (!canvasRef.value) return null;
-  
+
   const rect = canvasRef.value.getBoundingClientRect();
   const mouse = new THREE.Vector2(
     ((event.clientX - rect.left) / rect.width) * 2 - 1,
-    -((event.clientY - rect.top) / rect.height) * 2 + 1
+    -((event.clientY - rect.top) / rect.height) * 2 + 1,
   );
 
   const raycaster = new THREE.Raycaster();
@@ -178,7 +541,7 @@ function handleFloorClick(event: MouseEvent) {
 
   // 添加点标记
   const marker = createPointMarker(p, 0.8);
-  marker.name = 'floor-marker';
+  marker.name = "floor-marker";
   scene.add(marker);
   tempFloorMarkers.push(marker);
 
@@ -187,7 +550,7 @@ function handleFloorClick(event: MouseEvent) {
 
 function handleFloorDoubleClick() {
   if (editorStore.currentFloorPoints.length < 3) {
-    editorStore.updateStatusMessage('需要至少3个点来创建地板区域');
+    editorStore.updateStatusMessage("需要至少3个点来创建地板区域");
     return;
   }
 
@@ -222,12 +585,12 @@ function updateFloorDrawingLine() {
   const geometry = createLineGeometry(editorStore.currentFloorPoints);
   const material = new THREE.LineBasicMaterial({ color: 0x00ff88 });
   tempFloorLine = new THREE.Line(geometry, material);
-  tempFloorLine.name = 'floor-temp-line';
+  tempFloorLine.name = "floor-temp-line";
   scene.add(tempFloorLine);
 }
 
 function clearFloorTempObjects() {
-  tempFloorMarkers.forEach(m => {
+  tempFloorMarkers.forEach((m) => {
     scene.remove(m);
     m.geometry.dispose();
     (m.material as THREE.Material).dispose();
@@ -259,7 +622,7 @@ function handleWallDoubleClick(event: MouseEvent) {
   if (!editorStore.currentWallStart) {
     // 设置起点
     editorStore.setWallStart(p);
-    
+
     // 创建起点标记
     const geo = new THREE.SphereGeometry(0.6, 16, 16);
     const mat = new THREE.MeshBasicMaterial({ color: 0xff9f43 });
@@ -269,7 +632,7 @@ function handleWallDoubleClick(event: MouseEvent) {
   } else {
     // 完成墙体
     editorStore.completeWallSegment(p);
-    
+
     // 创建墙体线条
     const lastWall = editorStore.wallSegments[editorStore.wallSegments.length - 1];
     if (lastWall) {
@@ -312,13 +675,13 @@ function clearWallTempObjects() {
 
 // ================== 模型生成 ==================
 function generateModels() {
-  console.log('开始生成模型，地板多边形数量:', editorStore.floorPolygons.length);
-  
+  console.log("开始生成模型，地板多边形数量:", editorStore.floorPolygons.length);
+
   // 生成地板模型
   editorStore.floorPolygons.forEach((polygon, index) => {
     console.log(`处理地板 ${index}:`, polygon.points);
     if (polygon.points.length < 3) {
-      console.warn('地板顶点不足3个，跳过');
+      console.warn("地板顶点不足3个，跳过");
       return;
     }
 
@@ -334,12 +697,12 @@ function generateModels() {
     shape.closePath();
 
     // 挤出设置
-    const extrudeSettings = { 
-      depth: DEFAULT_MODEL_PARAMS.floorThickness, 
-      bevelEnabled: false 
+    const extrudeSettings = {
+      depth: DEFAULT_MODEL_PARAMS.floorThickness,
+      bevelEnabled: false,
     };
     const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    
+
     // 旋转使平面从 XY 变为 XZ（地面平面）
     // 旋转后: X不变, Y → Z, Z → -Y
     geometry.rotateX(-Math.PI / 2);
@@ -348,7 +711,7 @@ function generateModels() {
       color: DEFAULT_MODEL_PARAMS.floorColor,
       transparent: true,
       opacity: DEFAULT_MODEL_PARAMS.floorOpacity,
-      side: THREE.DoubleSide
+      side: THREE.DoubleSide,
     });
 
     const mesh = new THREE.Mesh(geometry, material);
@@ -359,8 +722,8 @@ function generateModels() {
     mesh.name = `floor-model-${polygon.id}`;
     scene.add(mesh);
     polygon.mesh = mesh;
-    
-    console.log('地板模型已添加到场景:', mesh.name);
+
+    console.log("地板模型已添加到场景:", mesh.name);
   });
 
   // 生成墙体模型
@@ -386,13 +749,13 @@ function generateModels() {
   });
 
   editorStore.setGeneratedModel(true);
-  editorStore.updateStatusMessage('3D模型已生成！使用鼠标旋转查看');
+  editorStore.updateStatusMessage("3D模型已生成！使用鼠标旋转查看");
 }
 
 // ================== 平面图上传 ==================
 async function uploadFloorPlan(file: File): Promise<boolean> {
-  if (!file.type.startsWith('image/')) {
-    editorStore.updateStatusMessage('请上传图片文件 (JPG/PNG)');
+  if (!file.type.startsWith("image/")) {
+    editorStore.updateStatusMessage("请上传图片文件 (JPG/PNG)");
     return false;
   }
 
@@ -417,18 +780,23 @@ async function uploadFloorPlan(file: File): Promise<boolean> {
     });
 
     const geometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
-    const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.9,
+    });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.y = 0.01;
-    mesh.name = 'floor-plan-image';
+    mesh.name = "floor-plan-image";
     scene.add(mesh);
 
     editorStore.setFloorPlan({ url: imageUrl, width: img.width, height: img.height, mesh });
     return true;
   } catch (error) {
-    console.error('图片加载失败:', error);
-    editorStore.updateStatusMessage('图片加载失败，请重试');
+    console.error("图片加载失败:", error);
+    editorStore.updateStatusMessage("图片加载失败，请重试");
     return false;
   }
 }
@@ -437,7 +805,7 @@ async function uploadFloorPlan(file: File): Promise<boolean> {
 function clearScene() {
   const toRemove: THREE.Object3D[] = [];
   scene.traverse((child) => {
-    if (child instanceof THREE.Mesh && child.name !== 'ground-plane') {
+    if (child instanceof THREE.Mesh && child.name !== "ground-plane") {
       toRemove.push(child);
     } else if (child instanceof THREE.Line) {
       toRemove.push(child);
@@ -449,7 +817,7 @@ function clearScene() {
     if (obj instanceof THREE.Mesh) {
       obj.geometry?.dispose();
       if (Array.isArray(obj.material)) {
-        obj.material.forEach(m => m.dispose());
+        obj.material.forEach((m) => m.dispose());
       } else {
         (obj.material as THREE.Material)?.dispose();
       }
@@ -470,15 +838,15 @@ function clearScene() {
 
 // ================== 事件处理 ==================
 function handleClick(event: MouseEvent) {
-  if (editorStore.mode === 'draw-floor') {
+  if (editorStore.mode === "draw-floor") {
     handleFloorClick(event);
   }
 }
 
 function handleDoubleClick(event: MouseEvent) {
-  if (editorStore.mode === 'draw-floor') {
+  if (editorStore.mode === "draw-floor") {
     handleFloorDoubleClick();
-  } else if (editorStore.mode === 'draw-wall') {
+  } else if (editorStore.mode === "draw-wall") {
     handleWallDoubleClick(event);
   }
 }
@@ -487,16 +855,16 @@ function handleDoubleClick(event: MouseEvent) {
 defineExpose({
   generateModels,
   clearScene,
-  uploadFloorPlan
+  uploadFloorPlan,
 });
 
 onMounted(() => {
   initThree();
   if (canvasRef.value) {
-    canvasRef.value.addEventListener('click', handleClick);
-    canvasRef.value.addEventListener('dblclick', handleDoubleClick);
+    canvasRef.value.addEventListener("click", handleClick);
+    canvasRef.value.addEventListener("dblclick", handleDoubleClick);
   }
-  window.addEventListener('resize', handleResize);
+  window.addEventListener("resize", handleResize);
 });
 
 onUnmounted(() => {
@@ -505,7 +873,7 @@ onUnmounted(() => {
   }
   controls?.dispose();
   renderer?.dispose();
-  window.removeEventListener('resize', handleResize);
+  window.removeEventListener("resize", handleResize);
 });
 </script>
 

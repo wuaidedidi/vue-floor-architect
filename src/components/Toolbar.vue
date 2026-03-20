@@ -3,9 +3,9 @@
     <div class="toolbar-brand">
       <div class="brand-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-          <path d="M2 17l10 5 10-5"/>
-          <path d="M2 12l10 5 10-5"/>
+          <path d="M12 2L2 7l10 5 10-5-10-5z" />
+          <path d="M2 17l10 5 10-5" />
+          <path d="M2 12l10 5 10-5" />
         </svg>
       </div>
       <span class="brand-text">3D建模工具</span>
@@ -15,78 +15,70 @@
 
     <div class="toolbar-actions">
       <!-- 上传平面图 -->
-      <button 
+      <button
         class="toolbar-btn"
         :class="{ active: editorStore.mode === 'upload' }"
         @click="handleUploadClick"
-        title="上传平面图"
-      >
+        title="上传平面图">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-          <polyline points="17 8 12 3 7 8"/>
-          <line x1="12" y1="3" x2="12" y2="15"/>
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
         </svg>
         <span>上传平面图</span>
       </button>
 
       <!-- 加载默认平面图 -->
-      <button 
-        class="toolbar-btn default-btn"
-        @click="showDefaultConfirm = true"
-        title="加载默认示例平面图"
-      >
+      <button class="toolbar-btn default-btn" @click="showDefaultConfirm = true" title="加载默认示例平面图">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <path d="M3 9h18"/>
-          <path d="M9 21V9"/>
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M3 9h18" />
+          <path d="M9 21V9" />
         </svg>
         <span>默认平面图</span>
       </button>
 
       <!-- 绘制地面 -->
-      <button 
+      <button
         class="toolbar-btn"
         :class="{ active: editorStore.mode === 'draw-floor' }"
         @click="editorStore.setMode('draw-floor')"
-        title="绘制地面区域"
-      >
+        title="绘制地面区域">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
-          <line x1="8" y1="2" x2="8" y2="18"/>
-          <line x1="16" y1="6" x2="16" y2="22"/>
+          <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+          <line x1="8" y1="2" x2="8" y2="18" />
+          <line x1="16" y1="6" x2="16" y2="22" />
         </svg>
         <span>绘制地面</span>
       </button>
 
       <!-- 绘制墙体 -->
-      <button 
+      <button
         class="toolbar-btn"
         :class="{ active: editorStore.mode === 'draw-wall' }"
         @click="editorStore.setMode('draw-wall')"
-        title="绘制墙体"
-      >
+        title="绘制墙体">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <path d="M3 9h18"/>
-          <path d="M3 15h18"/>
-          <path d="M9 3v18"/>
-          <path d="M15 3v18"/>
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M3 9h18" />
+          <path d="M3 15h18" />
+          <path d="M9 3v18" />
+          <path d="M15 3v18" />
         </svg>
         <span>绘制墙体</span>
       </button>
 
       <!-- 生成模型 -->
-      <button 
+      <button
         class="toolbar-btn generate-btn"
         :class="{ disabled: !editorStore.canGenerate }"
         :disabled="!editorStore.canGenerate"
         @click="handleGenerate"
-        title="生成3D模型"
-      >
+        title="生成3D模型">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-          <path d="M2 17l10 5 10-5"/>
-          <path d="M2 12l10 5 10-5"/>
+          <path d="M12 2L2 7l10 5 10-5-10-5z" />
+          <path d="M2 17l10 5 10-5" />
+          <path d="M2 12l10 5 10-5" />
         </svg>
         <span>生成模型</span>
       </button>
@@ -94,29 +86,38 @@
 
     <div class="toolbar-spacer"></div>
 
+    <!-- 天气切换 -->
+    <div class="weather-controls">
+      <span class="weather-label">天气效果:</span>
+      <div class="weather-buttons">
+        <button
+          v-for="(preset, key) in weatherPresets"
+          :key="key"
+          class="weather-btn"
+          :class="{ active: editorStore.currentWeather === key }"
+          @click="editorStore.setWeather(key)"
+          :title="preset.label">
+          <span class="weather-icon">{{ preset.icon }}</span>
+          <span class="weather-text">{{ preset.label }}</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
     <!-- 清空按钮 -->
-    <button 
-      class="toolbar-btn clear-btn"
-      @click="handleClear"
-      title="清空所有内容"
-    >
+    <button class="toolbar-btn clear-btn" @click="handleClear" title="清空所有内容">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="3 6 5 6 21 6"/>
-        <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-        <line x1="10" y1="11" x2="10" y2="17"/>
-        <line x1="14" y1="11" x2="14" y2="17"/>
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+        <line x1="10" y1="11" x2="10" y2="17" />
+        <line x1="14" y1="11" x2="14" y2="17" />
       </svg>
       <span>清空</span>
     </button>
 
     <!-- 隐藏的文件输入 -->
-    <input 
-      ref="fileInput"
-      type="file"
-      accept="image/*"
-      style="display: none"
-      @change="handleFileChange"
-    />
+    <input ref="fileInput" type="file" accept="image/*" style="display: none" @change="handleFileChange" />
 
     <!-- 确认加载默认平面图的对话框 -->
     <Teleport to="body">
@@ -125,23 +126,21 @@
           <div class="confirm-dialog">
             <div class="dialog-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                <path d="M3 9h18"/>
-                <path d="M9 21V9"/>
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M3 9h18" />
+                <path d="M9 21V9" />
               </svg>
             </div>
             <h3 class="dialog-title">加载默认平面图</h3>
             <p class="dialog-message">
-              是否加载示例平面图？<br/>
+              是否加载示例平面图？<br />
               <small>这将显示一个包含客厅、卧室、厨房等房间的户型图</small>
             </p>
             <div class="dialog-actions">
-              <button class="dialog-btn cancel-btn" @click="showDefaultConfirm = false">
-                取消
-              </button>
+              <button class="dialog-btn cancel-btn" @click="showDefaultConfirm = false">取消</button>
               <button class="dialog-btn confirm-btn" @click="loadDefaultFloorPlan">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="20 6 9 17 4 12"/>
+                  <polyline points="20 6 9 17 4 12" />
                 </svg>
                 是，加载
               </button>
@@ -154,22 +153,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useEditorStore } from '../stores/editorStore';
+import { ref } from "vue";
+import { useEditorStore } from "../stores/editorStore";
+import { WEATHER_PRESETS } from "../types";
 
 const emit = defineEmits<{
-  (e: 'upload', file: File): void;
-  (e: 'load-default'): void;
-  (e: 'generate'): void;
-  (e: 'clear'): void;
+  (e: "upload", file: File): void;
+  (e: "load-default"): void;
+  (e: "generate"): void;
+  (e: "clear"): void;
 }>();
 
 const editorStore = useEditorStore();
 const fileInput = ref<HTMLInputElement | null>(null);
 const showDefaultConfirm = ref(false);
+const weatherPresets = WEATHER_PRESETS;
 
 function handleUploadClick() {
-  editorStore.setMode('upload');
+  editorStore.setMode("upload");
   fileInput.value?.click();
 }
 
@@ -177,25 +178,25 @@ function handleFileChange(event: Event) {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
   if (file) {
-    emit('upload', file);
+    emit("upload", file);
   }
   // 重置input，允许重复选择同一文件
-  target.value = '';
+  target.value = "";
 }
 
 function loadDefaultFloorPlan() {
   showDefaultConfirm.value = false;
-  emit('load-default');
+  emit("load-default");
 }
 
 function handleGenerate() {
   if (editorStore.canGenerate) {
-    emit('generate');
+    emit("generate");
   }
 }
 
 function handleClear() {
-  emit('clear');
+  emit("clear");
 }
 </script>
 
@@ -333,6 +334,58 @@ function handleClear() {
   flex: 1;
 }
 
+.weather-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.weather-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.weather-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.weather-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.weather-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--primary-color);
+}
+
+.weather-btn.active {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+.weather-icon {
+  font-size: 16px;
+}
+
+.weather-text {
+  font-weight: 500;
+}
+
 /* 确认对话框样式 */
 .modal-overlay {
   position: fixed;
@@ -462,11 +515,11 @@ function handleClear() {
   .toolbar-btn span {
     display: none;
   }
-  
+
   .toolbar-btn {
     padding: 10px;
   }
-  
+
   .brand-text {
     display: none;
   }
