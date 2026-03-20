@@ -1,16 +1,18 @@
 <template>
   <div class="app-container">
-    <Toolbar 
-      @upload="handleUpload"
-      @load-default="handleLoadDefault"
-      @generate="handleGenerate"
-      @clear="handleClear"
-    />
-    
+    <Toolbar @upload="handleUpload" @load-default="handleLoadDefault" @generate="handleGenerate" @clear="handleClear" />
+
     <div class="main-content">
       <ThreeScene ref="threeSceneRef" @scene-ready="onSceneReady" />
+
+      <!-- 施工阶段时间轴 -->
+      <Transition name="slide-up">
+        <div v-if="editorStore.hasGeneratedModel" class="timeline-wrapper">
+          <ConstructionTimeline />
+        </div>
+      </Transition>
     </div>
-    
+
     <StatusBar />
 
     <!-- 消息提示组件 -->
@@ -26,103 +28,110 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
-import { useEditorStore } from './stores/editorStore';
-import Toolbar from './components/Toolbar.vue';
-import ThreeScene from './components/ThreeScene.vue';
-import StatusBar from './components/StatusBar.vue';
+import { ref, computed, watch } from "vue";
+import { useEditorStore } from "./stores/editorStore";
+import Toolbar from "./components/Toolbar.vue";
+import ThreeScene from "./components/ThreeScene.vue";
+import StatusBar from "./components/StatusBar.vue";
+import ConstructionTimeline from "./components/ConstructionTimeline.vue";
 
 const editorStore = useEditorStore();
 const threeSceneRef = ref<InstanceType<typeof ThreeScene> | null>(null);
 
 // Toast状态
 const showToast = ref(false);
-const toastMessage = ref('');
-const toastType = ref<'success' | 'error' | 'info'>('info');
+const toastMessage = ref("");
+const toastType = ref<"success" | "error" | "info">("info");
 let toastTimeout: number | null = null;
 
 const toastIcon = computed(() => {
   switch (toastType.value) {
-    case 'success': return '✓';
-    case 'error': return '✕';
-    default: return 'ℹ';
+    case "success":
+      return "✓";
+    case "error":
+      return "✕";
+    default:
+      return "ℹ";
   }
 });
 
-function displayToast(message: string, type: 'success' | 'error' | 'info' = 'info') {
+function displayToast(message: string, type: "success" | "error" | "info" = "info") {
   if (toastTimeout) {
     clearTimeout(toastTimeout);
   }
-  
+
   toastMessage.value = message;
   toastType.value = type;
   showToast.value = true;
-  
+
   toastTimeout = window.setTimeout(() => {
     showToast.value = false;
   }, 3000);
 }
 
 function onSceneReady() {
-  displayToast('场景已就绪，可以开始操作', 'success');
+  displayToast("场景已就绪，可以开始操作", "success");
 }
 
 async function handleUpload(file: File) {
   if (threeSceneRef.value) {
     const success = await threeSceneRef.value.uploadFloorPlan(file);
     if (success) {
-      displayToast('平面图上传成功', 'success');
+      displayToast("平面图上传成功", "success");
     } else {
-      displayToast('平面图上传失败', 'error');
+      displayToast("平面图上传失败", "error");
     }
   }
 }
 
 async function handleLoadDefault() {
-  displayToast('正在加载默认平面图...', 'info');
+  displayToast("正在加载默认平面图...", "info");
   try {
     // 从public目录获取默认平面图
-    const response = await fetch('/sample-floor-plan.svg');
-    if (!response.ok) throw new Error('加载失败');
-    
+    const response = await fetch("/sample-floor-plan.svg");
+    if (!response.ok) throw new Error("加载失败");
+
     const blob = await response.blob();
-    const file = new File([blob], 'sample-floor-plan.svg', { type: 'image/svg+xml' });
-    
+    const file = new File([blob], "sample-floor-plan.svg", { type: "image/svg+xml" });
+
     if (threeSceneRef.value) {
       const success = await threeSceneRef.value.uploadFloorPlan(file);
       if (success) {
-        displayToast('默认平面图加载成功！', 'success');
+        displayToast("默认平面图加载成功！", "success");
       } else {
-        displayToast('平面图加载失败', 'error');
+        displayToast("平面图加载失败", "error");
       }
     }
   } catch (error) {
-    console.error('加载默认平面图失败:', error);
-    displayToast('加载默认平面图失败', 'error');
+    console.error("加载默认平面图失败:", error);
+    displayToast("加载默认平面图失败", "error");
   }
 }
 
 function handleGenerate() {
   if (threeSceneRef.value) {
     threeSceneRef.value.generateModels();
-    displayToast('3D模型生成成功！', 'success');
+    displayToast("3D模型生成成功！", "success");
   }
 }
 
 function handleClear() {
   if (threeSceneRef.value) {
     threeSceneRef.value.clearScene();
-    displayToast('已清空所有内容', 'info');
+    displayToast("已清空所有内容", "info");
   }
 }
 
 // 监听状态消息变化
-watch(() => editorStore.statusMessage, (message) => {
-  // 仅在特定关键消息时显示toast
-  if (message.includes('已创建') || message.includes('已生成')) {
-    displayToast(message, 'success');
-  }
-});
+watch(
+  () => editorStore.statusMessage,
+  (message) => {
+    // 仅在特定关键消息时显示toast
+    if (message.includes("已创建") || message.includes("已生成")) {
+      displayToast(message, "success");
+    }
+  },
+);
 </script>
 
 <style scoped>
@@ -205,5 +214,28 @@ watch(() => editorStore.statusMessage, (message) => {
 .toast-leave-to {
   opacity: 0;
   transform: translateX(-50%) translateY(-20px);
+}
+
+/* 时间轴容器样式 */
+.timeline-wrapper {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 800px;
+  z-index: 20;
+}
+
+/* 时间轴滑入动画 */
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(30px);
 }
 </style>
