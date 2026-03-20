@@ -1,15 +1,81 @@
-import { type Ref } from 'vue';
+import { type Ref, watch } from 'vue';
 import * as THREE from 'three';
 import { useEditorStore } from '../stores/editorStore';
 import type { ThreeSceneContext } from './useThreeScene';
-import { DEFAULT_MODEL_PARAMS, type Point3D } from '../types';
+import { 
+  DEFAULT_MODEL_PARAMS, 
+  CONSTRUCTION_PHASES,
+  type Point3D
+} from '../types';
 import { createShapeFromPoints, distanceXZ, calculateAngleXZ, midpoint } from '../utils/geometryUtils';
+import { createConstructionMaterial, getPhaseFromProgress } from '../utils/constructionShaders';
 
 export function useModelGenerator(contextRef: Ref<ThreeSceneContext | null>) {
   const store = useEditorStore();
   
   // 存储生成的模型
   const generatedMeshes: THREE.Mesh[] = [];
+  const wallMeshes: THREE.Mesh[] = [];
+
+  // 监听施工阶段变化 - 使用时间轴的整体进度值
+  watch(
+    () => {
+      // 将阶段和进度转换为 0-3 的整体进度
+      const phaseMap: Record<string, number> = {
+        'rough': 0,
+        'plumbing': 1,
+        'hard': 2,
+        'soft': 3
+      };
+      const baseProgress = phaseMap[store.constructionPhase] || 0;
+      const globalProgress = baseProgress + store.constructionProgress;
+      return globalProgress;
+    },
+    (globalProgress) => {
+      updateWallMaterials(globalProgress);
+    },
+    { immediate: false }
+  );
+
+  /**
+   * 更新墙体材质
+   */
+  function updateWallMaterials(globalProgress: number) {
+    const phaseInfo = getPhaseFromProgress(globalProgress);
+    const phaseKeys = ['rough', 'plumbing', 'hard', 'soft'];
+    
+    const fromPhaseKey = phaseKeys[phaseInfo.fromIndex];
+    const toPhaseKey = phaseKeys[phaseInfo.toIndex];
+    
+    const paramsFrom = CONSTRUCTION_PHASES[fromPhaseKey as keyof typeof CONSTRUCTION_PHASES];
+    const paramsTo = CONSTRUCTION_PHASES[toPhaseKey as keyof typeof CONSTRUCTION_PHASES];
+    
+    wallMeshes.forEach(mesh => {
+      const material = mesh.material as THREE.ShaderMaterial;
+      if (material && material.uniforms) {
+        // 更新颜色
+        material.uniforms.uColorFrom.value.setHex(paramsFrom.color);
+        material.uniforms.uColorTo.value.setHex(paramsTo.color);
+        
+        // 更新材质参数
+        material.uniforms.uRoughnessFrom.value = paramsFrom.roughness;
+        material.uniforms.uRoughnessTo.value = paramsTo.roughness;
+        material.uniforms.uMetalnessFrom.value = paramsFrom.metalness;
+        material.uniforms.uMetalnessTo.value = paramsTo.metalness;
+        material.uniforms.uNoiseScaleFrom.value = paramsFrom.noiseScale;
+        material.uniforms.uNoiseScaleTo.value = paramsTo.noiseScale;
+        material.uniforms.uNoiseIntensityFrom.value = paramsFrom.noiseIntensity;
+        material.uniforms.uNoiseIntensityTo.value = paramsTo.noiseIntensity;
+        
+        // 更新过渡位置（从上到下）
+        // transitionY: 1 = 全部显示from材质, 0 = 全部显示to材质
+        material.uniforms.uTransitionY.value = phaseInfo.transitionY;
+        material.uniforms.uGlobalProgress.value = globalProgress;
+        
+        material.needsUpdate = true;
+      }
+    });
+  }
 
   /**
    * 生成所有3D模型
@@ -97,12 +163,10 @@ export function useModelGenerator(contextRef: Ref<ThreeSceneContext | null>) {
         DEFAULT_MODEL_PARAMS.wallThickness
       );
 
-      // 创建材质
-      const material = new THREE.MeshPhongMaterial({
-        color: DEFAULT_MODEL_PARAMS.wallColor,
-        side: THREE.DoubleSide,
-        shininess: 30
-      });
+      // 创建施工阶段材质
+      const material = createConstructionMaterial(
+        DEFAULT_MODEL_PARAMS.wallHeight
+      );
 
       // 创建网格
       const mesh = new THREE.Mesh(geometry, material);
@@ -125,10 +189,22 @@ export function useModelGenerator(contextRef: Ref<ThreeSceneContext | null>) {
 
       scene.add(mesh);
       generatedMeshes.push(mesh);
+      wallMeshes.push(mesh);
 
       // 存储引用
       wall.mesh = mesh;
     });
+    
+    // 初始化材质状态
+    const phaseMap: Record<string, number> = {
+      'rough': 0,
+      'plumbing': 1,
+      'hard': 2,
+      'soft': 3
+    };
+    const baseProgress = phaseMap[store.constructionPhase] || 0;
+    const globalProgress = baseProgress + store.constructionProgress;
+    updateWallMaterials(globalProgress);
   }
 
   /**
@@ -149,6 +225,7 @@ export function useModelGenerator(contextRef: Ref<ThreeSceneContext | null>) {
     });
 
     generatedMeshes.length = 0;
+    wallMeshes.length = 0;
     store.setGeneratedModel(false);
   }
 
@@ -163,6 +240,7 @@ export function useModelGenerator(contextRef: Ref<ThreeSceneContext | null>) {
   return {
     generateModels,
     clearGeneratedModels,
-    regenerateModels
+    regenerateModels,
+    updateWallMaterials
   };
 }
